@@ -71,3 +71,6 @@ Testing/
 managed_components/
 sdkconfig
 sdkconfig.old
+
+# Compile-time secrets. Keep secrets.env.example.
+secrets.env

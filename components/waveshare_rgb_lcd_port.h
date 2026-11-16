@@ -30,7 +30,8 @@
 #define EXAMPLE_RGB_BIT_PER_PIXEL       (16)
 #define EXAMPLE_RGB_DATA_WIDTH          (16)
 #define EXAMPLE_RGB_BOUNCE_LINES        (10)
-#define EXAMPLE_RGB_BOUNCE_BUFFER_SIZE  (EXAMPLE_LCD_H_RES * EXAMPLE_RGB_BOUNCE_LINES * EXAMPLE_RGB_BIT_PER_PIXEL / 8)
+/* Pixel count. The RGB driver multiplies this by bytes per pixel and allocates two DMA buffers. */
+#define EXAMPLE_RGB_BOUNCE_BUFFER_SIZE  (EXAMPLE_LCD_H_RES * EXAMPLE_RGB_BOUNCE_LINES)
 #define EXAMPLE_LCD_IO_RGB_DISP         (-1)
 #define EXAMPLE_LCD_IO_RGB_VSYNC        (GPIO_NUM_3)
 #define EXAMPLE_LCD_IO_RGB_HSYNC        (GPIO_NUM_46)

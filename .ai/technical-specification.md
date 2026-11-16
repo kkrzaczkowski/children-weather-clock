@@ -12,9 +12,9 @@ Children's weather clock firmware for the Waveshare **ESP32-S3-Touch-LCD-7** (to
 | Framework | ESP-IDF 5.5.6 (`C:\esp\v5.5.6\esp-idf`) |
 | Flash / monitor port in VS Code | COM6, UART |
 | Reference sample | `sample-project-09_lvgl_v9_demo/` (not part of this build) |
-| Current screen | Centered label `Hello world`, Montserrat 24, rotation 0 |
+| Current screen | Clock, weather, and character panels. An amber **Uwaga** card lists a TF-card or Wi-Fi problem. Rotation 0 |
 
-`app_main` initializes the RGB panel and GT911 touch, turns the backlight on through the CH422G, starts `esp_lv_adapter` with the task stack in PSRAM, registers the 800×480 display and the touch input, then creates the label on the active screen inside the LVGL lock.
+`app_main` initializes the RGB panel and GT911 touch, turns the backlight on through the CH422G, starts `esp_lv_adapter` with the task stack in PSRAM, and registers the 800×480 display and the touch input. It builds the clock UI, starts Wi-Fi, and only then starts the TF-card task. Wi-Fi takes its DMA buffers before the card bus, so a missing card cannot starve the radio.
 
 ## Software libraries
 
@@ -47,8 +47,23 @@ Display timings used by this firmware (`waveshare_rgb_lcd_port.h`):
 - Pixel clock 16 MHz
 - Horizontal: pulse 4, back porch 8, front porch 8, pixel clock active on the negative edge
 - Vertical: pulse 4, back porch 8, front porch 8
-- Frame buffers in PSRAM, bounce buffer of 10 lines
+- Frame buffers in PSRAM
+- Bounce buffer of 10 lines, passed to the RGB driver as a **pixel count** (`800 × 10`). The driver multiplies that count by bytes per pixel and allocates two DMA buffers. Passing a byte count instead doubles the reservation and leaves Wi-Fi without internal DMA memory
 - Rotation 0, tear-avoid mode `ESP_LV_ADAPTER_TEAR_AVOID_MODE_DEFAULT_RGB`
+
+`CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP` is enabled, so Wi-Fi and LwIP allocations prefer PSRAM and fall back to internal RAM. The station still uses a small buffer set: 6 static RX buffers and at most 16 dynamic RX and TX buffers. `esp_wifi_init` failure is logged and shown on the **Uwaga** card. It does not call `abort` or restart the chip.
+
+The TF card is mounted once, after Wi-Fi init. A failed mount frees the SPI bus when this firmware created it. The card is not polled again until the next boot. The main-screen messages are:
+
+| Condition | Text under **Uwaga** |
+| --- | --- |
+| No card at startup (`ESP_ERR_TIMEOUT` or `ESP_ERR_NOT_FOUND`) | Brak karty pamięci |
+| Other card or SPI failure | Karta pamięci nie działa |
+| Less than 64 KB free on the card | Karta pamięci jest pełna |
+| Wi-Fi driver did not start | Wi-Fi nie działa |
+| Saved network rejected the login | Nie można połączyć z zapisaną siecią |
+| Saved network not found | Nie znaleziono sieci Wi-Fi |
+| Other disconnect | Brak połączenia z siecią |
 
 ## Board
 
@@ -145,6 +160,10 @@ GPIO numbers are the ESP32-S3 pins. EXIO pins are outputs of the CH422G, not ESP
 | CH422G EXIO2 | DISP | Backlight enable |
 
 This firmware turns the backlight on by putting the CH422G into output mode (write `0x01` to I²C address `0x24`) and then writing `0x1E` to address `0x38`.
+
+EXIO2 is a digital output. The board has no PWM pin for the backlight, so brightness cannot be changed in hardware. Night dimming is a translucent black layer over the whole LVGL interface. The backlight stays on.
+
+Bit 4 of the `0x38` output byte is EXIO4, the TF-card chip select, active low. The SDSPI driver toggles GPIO6 as a mirror chip select. GPIO6 is the unused sensor-header ADC pin. Each change of that pin is copied to EXIO4 so the card is selected without disturbing the backlight bit. The sensor header must stay unconnected.
 
 ### Touch (this unit)
 
