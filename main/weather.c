@@ -219,7 +219,7 @@ static bool fetch_once(void)
     if (err != ESP_OK) {
         esp_http_client_cleanup(client);
         remember_error("Brak połączenia z Open-Meteo");
-        log_event(LOG_WARN, "Open-Meteo: połączenie nieudane");
+        log_event(LOG_WARN, "Open-Meteo: połączenie nieudane (%s)", esp_err_to_name(err));
         return false;
     }
     esp_http_client_fetch_headers(client);

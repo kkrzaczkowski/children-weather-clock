@@ -3,6 +3,7 @@
 #include "board_io.h"
 #include "driver/sdspi_host.h"
 #include "driver/spi_master.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_vfs_fat.h"
 #include "freertos/FreeRTOS.h"
@@ -80,7 +81,8 @@ sd_status_t sdcard_mount(void)
 
     err = esp_vfs_fat_sdspi_mount("/sdcard", &host, &slot, &mount, &s_card);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "TF mount failed: %s", esp_err_to_name(err));
+        ESP_LOGW(TAG, "TF mount failed: %s (largest DMA block %u)", esp_err_to_name(err),
+                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DMA));
         if (own_bus) {
             spi_bus_free(SPI2_HOST);
         }

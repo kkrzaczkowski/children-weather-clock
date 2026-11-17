@@ -132,6 +132,9 @@ void wifi_start(void)
     wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
     /* A weather clock does not need the default high-throughput buffers. */
     init.static_rx_buf_num = 6;
+    /* Static TX buffers stay allocated in internal DMA RAM. 16 of them leave the
+       TF card without a bounce buffer once the RGB panel is up. */
+    init.static_tx_buf_num = 8;
     if (init.dynamic_rx_buf_num > 16) {
         init.dynamic_rx_buf_num = 16;
     }
