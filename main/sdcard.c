@@ -1,11 +1,13 @@
 #include "sdcard.h"
 
+#include "board_io.h"
 #include "driver/sdspi_host.h"
 #include "driver/spi_master.h"
 #include "esp_log.h"
 #include "esp_vfs_fat.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "sd_cs.h"
 #include "sdmmc_cmd.h"
 
 static const char *TAG = "sdcard";
@@ -41,6 +43,7 @@ bool sdcard_mounted(void)
 
 sd_status_t sdcard_mount(void)
 {
+    /* EXIO4 stays high until the driver selects the card. board_io_init left bit 4 set. */
     spi_bus_config_t bus = {
         .mosi_io_num = GPIO_NUM_11,
         .miso_io_num = GPIO_NUM_13,
@@ -53,6 +56,7 @@ sd_status_t sdcard_mount(void)
     bool own_bus = err == ESP_OK;
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
         ESP_LOGE(TAG, "SPI init failed: %s", esp_err_to_name(err));
+        board_io_sd_select(false);
         s_error = "Karta pamięci nie działa";
         return SD_MISSING;
     }
@@ -60,10 +64,13 @@ sd_status_t sdcard_mount(void)
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
     host.slot = SPI2_HOST;
     host.max_freq_khz = 10000;
+    /* This card rejects CMD59 while it is still idle. Leave data CRC off and continue. */
+    host.flags |= SDMMC_HOST_FLAG_SPI_IGNORE_DATA_CRC;
 
     sdspi_device_config_t slot = SDSPI_DEVICE_CONFIG_DEFAULT();
     slot.host_id = SPI2_HOST;
-    slot.gpio_cs = GPIO_NUM_6;
+    /* Token only. sd_cs applies these edges to EXIO4 and does not drive GPIO6. */
+    slot.gpio_cs = SD_CS_TOKEN_GPIO;
 
     esp_vfs_fat_mount_config_t mount = {
         .format_if_mount_failed = false,
@@ -77,6 +84,7 @@ sd_status_t sdcard_mount(void)
         if (own_bus) {
             spi_bus_free(SPI2_HOST);
         }
+        board_io_sd_select(false);
         s_error = (err == ESP_ERR_TIMEOUT || err == ESP_ERR_NOT_FOUND) ? "Brak karty pamięci" : "Karta pamięci nie działa";
         return SD_MISSING;
     }

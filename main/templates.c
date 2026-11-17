@@ -8,6 +8,7 @@
 
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "lvgl.h"
@@ -393,7 +394,16 @@ void storage_start(void)
         paint_fallback(s_right_px, 2);
         make_dsc(&s_right_dsc, s_right_px);
     }
-    xTaskCreate(storage_task, "storage", 16384, NULL, 3, NULL);
+    if (xTaskCreateWithCaps(storage_task, "storage", 16384, NULL, 3, NULL, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
+        app_state_lock();
+        app_model_t *model = app_state_edit();
+        model->sd_ok = false;
+        model->logs_on = false;
+        snprintf(model->sd_error, sizeof(model->sd_error), "%s", "Karta pamięci nie działa");
+        app_state_bump();
+        app_state_unlock();
+        log_event(LOG_ERROR, "Karta TF: brak pamięci na zadanie");
+    }
 }
 
 void storage_request(int left_band, int right_band)

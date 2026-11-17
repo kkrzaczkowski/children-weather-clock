@@ -11,6 +11,7 @@
 #include "esp_http_client.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 
@@ -344,5 +345,8 @@ static void weather_task(void *arg)
 void weather_start(void)
 {
     s_lock = xSemaphoreCreateMutex();
-    xTaskCreate(weather_task, "weather", 12288, NULL, 3, NULL);
+    if (xTaskCreateWithCaps(weather_task, "weather", 20480, NULL, 3, NULL, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
+        remember_error("Brak pamięci na pobranie pogody");
+        log_event(LOG_ERROR, "Open-Meteo: brak pamięci zadania");
+    }
 }

@@ -43,6 +43,7 @@ idf_component_register(
         esp_driver_sdspi
         esp_driver_spi
         esp_driver_gpio
+        sd_cs
         esp_driver_i2c
         mbedtls
         espressif__libpng
@@ -72,8 +73,6 @@ if(NOT secrets_rc EQUAL 0)
 endif()
 target_include_directories(${COMPONENT_LIB} PUBLIC "${CMAKE_BINARY_DIR}/generated")
 
-target_link_options(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=gpio_set_level")
-
 idf_build_get_property(build_components BUILD_COMPONENTS)
 if("lvgl" IN_LIST build_components)
     idf_component_get_property(lvgl_lib lvgl COMPONENT_LIB)
@@ -84,3 +83,12 @@ endif()
 if(lvgl_lib)
     target_compile_options(${lvgl_lib} PRIVATE -Wno-format)
 endif()
+
+# Rename chip-select calls inside the SDSPI driver only. GPIO6 is a token;
+# sd_cs mirrors the level to EXIO4 and does not drive the pad.
+idf_component_get_property(sdspi esp_driver_sdspi COMPONENT_LIB)
+target_compile_definitions(${sdspi} PRIVATE
+    "gpio_set_level=sd_cs_gpio_set_level"
+    "gpio_config=sd_cs_gpio_config")
+idf_component_get_property(sd_cs_lib sd_cs COMPONENT_LIB)
+target_link_libraries(${sdspi} PUBLIC ${sd_cs_lib})

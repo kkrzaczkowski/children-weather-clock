@@ -6,6 +6,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "esp_heap_caps.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_random.h"
@@ -424,14 +425,18 @@ void http_panel_start(void)
         return;
     }
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    /* Internal RAM has no 10 KB hole left after the RGB bounce buffers and Wi-Fi.
+     * NVS writes run on nvs_save, because this stack lives in PSRAM. */
     config.stack_size = 10240;
+    config.task_caps = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.max_uri_handlers = 8;
     config.lru_purge_enable = true;
     config.max_open_sockets = 4;
-    if (httpd_start(&s_server, &config) != ESP_OK) {
+    esp_err_t err = httpd_start(&s_server, &config);
+    if (err != ESP_OK) {
         s_server = NULL;
-        ESP_LOGE(TAG, "Nie można uruchomić panelu");
+        ESP_LOGE(TAG, "Nie można uruchomić panelu: %s", esp_err_to_name(err));
         return;
     }
     const httpd_uri_t routes[] = {

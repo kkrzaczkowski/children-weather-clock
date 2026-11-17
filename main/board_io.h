@@ -1,6 +1,8 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 void board_io_init(void);
-void board_io_mirror_cs(uint32_t level);
+/* Active-low TF chip select on CH422G EXIO4. Called for each SDSPI transfer. */
+bool board_io_sd_select(bool selected);

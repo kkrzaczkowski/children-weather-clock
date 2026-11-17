@@ -172,6 +172,10 @@ void wifi_start(void)
     if (!wifi_step(esp_wifi_start(), "wifi start", true)) {
         return;
     }
+    /* Modem sleep misses beacons while the RGB panel is running, then auth frames fail. */
+    if (!wifi_step(esp_wifi_set_ps(WIFI_PS_NONE), "wifi ps", true)) {
+        return;
+    }
     ESP_LOGI(TAG, "Łączenie z siecią %s", APP_WIFI_SSID);
     log_event(LOG_INFO, "Wi-Fi: łączenie z %s", APP_WIFI_SSID);
 }

@@ -53,6 +53,10 @@ Display timings used by this firmware (`waveshare_rgb_lcd_port.h`):
 
 `CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP` is enabled, so Wi-Fi and LwIP allocations prefer PSRAM and fall back to internal RAM. The station still uses a small buffer set: 6 static RX buffers and at most 16 dynamic RX and TX buffers. `esp_wifi_init` failure is logged and shown on the **Uwaga** card. It does not call `abort` or restart the chip.
 
+The web panel listens on port 80 once the station has an IP address. Its task stack is 10 KB in PSRAM (`MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT`). After the RGB bounce buffers and the Wi-Fi DMA buffers are reserved, internal RAM has no contiguous 10 KB block left, and `httpd_start` fails with `ESP_ERR_HTTPD_TASK` when that stack is forced into internal RAM. The stack stays at 10 KB because the configuration handler keeps `app_model_t`, a log-name table, and the `log_list` scratch array on it.
+
+An NVS commit disables the flash cache, so that write cannot run on a PSRAM stack. `config_store_init` starts an `nvs_save` task with a 4096-byte internal stack before Wi-Fi, while internal RAM is still contiguous. `config_store_save` copies the new `clock_config_t` to that task and waits for the result. The web panel, the on-screen settings page, template scan, and the corner-gesture template change all use this path, because the HTTP, LVGL, and storage tasks have PSRAM stacks. Migration inside `config_store_init` writes NVS directly on `app_main`, whose stack is internal. `log_event` only queues a line; the `log` task writes the TF card from its own internal stack.
+
 The TF card is mounted once, after Wi-Fi init. A failed mount frees the SPI bus when this firmware created it. The card is not polled again until the next boot. The main-screen messages are:
 
 | Condition | Text under **Uwaga** |
@@ -163,7 +167,7 @@ This firmware turns the backlight on by putting the CH422G into output mode (wri
 
 EXIO2 is a digital output. The board has no PWM pin for the backlight, so brightness cannot be changed in hardware. Night dimming is a translucent black layer over the whole LVGL interface. The backlight stays on.
 
-Bit 4 of the `0x38` output byte is EXIO4, the TF-card chip select, active low. The SDSPI driver toggles GPIO6 as a mirror chip select. GPIO6 is the unused sensor-header ADC pin. Each change of that pin is copied to EXIO4 so the card is selected without disturbing the backlight bit. The sensor header must stay unconnected.
+Bit 4 of the `0x38` output byte is EXIO4, the TF-card chip select, active low. The TF slot is the only device on that SPI bus. The SDSPI driver raises chip select for the 80 clocks before `CMD0`, holds it low for the command and data, then raises it again for the trailing `0xFF`. EXIO4 is not an ESP32 GPIO, so the slot is given GPIO6 as a token number only. A hook compiled into the SDSPI driver applies those level changes to EXIO4 and does not configure or drive GPIO6. The card idles deselected between commands. The card rejects `CMD59` while it is still idle, so the host leaves SPI data CRC off and continues initialization. The sensor header must stay unconnected.
 
 ### Touch (this unit)
 
@@ -220,7 +224,7 @@ Automatic transmit/receive control. A jumper connects a 120 Ω termination resis
 
 ### TF card
 
-SPI, and the user guide also notes MMC is supported. Chip select is not an ESP32 GPIO.
+SPI, and the user guide also notes MMC is supported. Chip select is not an ESP32 GPIO. The firmware passes GPIO6 to the SDSPI driver as a token and mirrors each edge to EXIO4 without driving the pad.
 
 | ESP32-S3 or expander | Signal |
 | --- | --- |
