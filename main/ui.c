@@ -13,18 +13,17 @@
 #include "ui_config.h"
 #include "weather.h"
 
-extern const lv_font_t font_clock_56;
-extern const lv_font_t font_clock_72;
-extern const lv_font_t font_clock_88;
-extern const lv_font_t font_temp_32;
-extern const lv_font_t font_temp_40;
-extern const lv_font_t font_temp_48;
+extern const lv_font_t font_clock_59;
+extern const lv_font_t font_clock_75;
+extern const lv_font_t font_clock_86;
+extern const lv_font_t font_temp_37;
+extern const lv_font_t font_temp_45;
 extern const lv_font_t font_label_20;
 extern const lv_font_t font_label_28;
 extern const lv_font_t font_label_36;
 
-static const lv_font_t *s_clock_fonts[] = {&font_clock_56, &font_clock_72, &font_clock_88};
-static const lv_font_t *s_temp_fonts[] = {&font_temp_32, &font_temp_40, &font_temp_48};
+static const lv_font_t *s_clock_fonts[] = {&font_clock_59, &font_clock_75, &font_clock_86};
+static const lv_font_t *s_temp_fonts[] = {&font_temp_37, &font_temp_45, &font_temp_45};
 static const lv_font_t *s_label_fonts[] = {&font_label_20, &font_label_28, &font_label_36};
 
 static lv_obj_t *s_left_img;
@@ -92,7 +91,8 @@ static void set_pair(lv_obj_t *group, lv_span_t *left, lv_span_t *right, int act
     style_span(right, font, feels_color(actual, feels));
     lv_span_set_text(left, prefix);
     lv_span_set_text(right, feels_text);
-    lv_obj_invalidate(group);
+    /* Expand mode keeps the size cached from the empty text until refresh. */
+    lv_spangroup_refresh(group);
 }
 
 static lv_obj_t *dot(lv_obj_t *parent, lv_color_t color, int size)
@@ -455,7 +455,7 @@ void ui_init(void)
     s_clock = lv_label_create(center);
     lv_label_set_text(s_clock, "00:00");
     lv_obj_set_style_text_color(s_clock, lv_color_white(), 0);
-    lv_obj_set_style_text_font(s_clock, &font_clock_72, 0);
+    lv_obj_set_style_text_font(s_clock, &font_clock_75, 0);
 
     s_current_spans = make_spans(center, &s_current_left, &s_current_right);
     lv_obj_add_flag(s_current_spans, LV_OBJ_FLAG_HIDDEN);

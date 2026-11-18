@@ -12,7 +12,7 @@ Children's weather clock firmware for the Waveshare **ESP32-S3-Touch-LCD-7** (to
 | Framework | ESP-IDF 5.5.6 (`C:\esp\v5.5.6\esp-idf`) |
 | Flash / monitor port in VS Code | COM6, UART |
 | Reference sample | `sample-project-09_lvgl_v9_demo/` (not part of this build) |
-| Current screen | Clock, weather, and character panels. An amber **Uwaga** card lists a TF-card or Wi-Fi problem. Rotation 0 |
+| Current screen | Clock, weather, and character panels. The center column is a flex layout: time, current temperature pair, weather icon, forecast temperature pair, and the label `dzisiaj` or `jutro 8:00`. Each temperature pair is an LVGL span group in expand mode (`LV_SIZE_CONTENT`). After the text and feels-like color are written, the firmware calls `lv_spangroup_refresh`, because `lv_span_set_text` leaves the cached size at the empty text from creation. An amber **Uwaga** card lists a TF-card or Wi-Fi problem. Rotation 0 |
 
 `app_main` initializes the RGB panel and GT911 touch, turns the backlight on through the CH422G, starts `esp_lv_adapter` with the task stack in PSRAM, and registers the 800×480 display and the touch input. It builds the clock UI, starts Wi-Fi, and only then starts the TF-card task. Wi-Fi takes its DMA buffers before the card bus, so a missing card cannot starve the radio.
 
@@ -23,23 +23,24 @@ Locked in `dependencies.lock`. Declared ranges are in `main/idf_component.yml`.
 | Component | Declared | Locked |
 | --- | --- | --- |
 | ESP-IDF | `>=5.1.0` | 5.5.6 |
-| `lvgl/lvgl` | `^9` | 9.5.0 |
+| `lvgl/lvgl` | `^9` | 9.6.0~1 |
 | `espressif/esp_lvgl_adapter` | `^0.5.2` | 0.5.3 |
 | `espressif/esp_lcd_touch_gt911` | `^1` | 1.2.1 |
 | `espressif/esp_lcd_touch` | transitive | 1.2.1 |
 
-LVGL is built with 16-bit color, FreeRTOS OS layer, refresh period 15 ms, two software draw units, and Montserrat 12, 16, 20, and 24. The widgets demo is turned off.
+LVGL is built with 16-bit color, FreeRTOS OS layer, refresh period 15 ms, two software draw units, the span and arc widgets, and Montserrat 12, 16, 20, and 24. The widgets demo is turned off. The clock, temperature, and forecast-label sizes are custom Montserrat faces in `main/fonts/`, not those built-in sizes.
 
 Build defaults in `sdkconfig.defaults`:
 
 - CPU 240 MHz
-- Flash QIO, 80 MHz, **image size set to 8 MB**
+- Flash QIO, 80 MHz, **image size set to 16 MB**
+- Custom partition table `partitions.csv`: `nvs` 24 KB at `0x9000`, `phy_init` 4 KB at `0xf000`, factory application 6 MB (`0x600000`) at `0x10000`
 - Octal PSRAM, 80 MHz, XIP from PSRAM, rodata in PSRAM, memory test off
 - FreeRTOS tick 1000 Hz
 - Instruction cache 32 KB, data cache 64 KB, data cache line 64 bytes
 - RGB tear-avoid enabled, LVGL port task on core 1
 
-The module itself is an ESP32-S3N16R8 with **16 MB** flash. The 8 MB setting is the current project image size, not the capacity of the chip.
+The module itself is an ESP32-S3N16R8 with **16 MB** flash. The image size matches that capacity. The factory application partition is 6 MB.
 
 Display timings used by this firmware (`waveshare_rgb_lcd_port.h`):
 
@@ -51,13 +52,15 @@ Display timings used by this firmware (`waveshare_rgb_lcd_port.h`):
 - Bounce buffer of 10 lines, passed to the RGB driver as a **pixel count** (`800 × 10`). The driver multiplies that count by bytes per pixel and allocates two DMA buffers. Passing a byte count instead doubles the reservation and leaves Wi-Fi without internal DMA memory
 - Rotation 0, tear-avoid mode `ESP_LV_ADAPTER_TEAR_AVOID_MODE_DEFAULT_RGB`
 
-`CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP` is enabled, so Wi-Fi and LwIP allocations prefer PSRAM and fall back to internal RAM. The station still uses a small buffer set: 6 static RX buffers and at most 16 dynamic RX and TX buffers. `esp_wifi_init` failure is logged and shown on the **Uwaga** card. It does not call `abort` or restart the chip.
+`CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP` is enabled, so Wi-Fi and LwIP allocations prefer PSRAM and fall back to internal RAM. The station uses 6 static RX buffers, 8 static TX buffers, and at most 16 dynamic RX and TX buffers. Static TX buffers stay in internal DMA RAM. Sixteen of them leave the TF card without a bounce buffer once the RGB panel is up. `esp_wifi_init` failure is logged and shown on the **Uwaga** card. It does not call `abort` or restart the chip.
+
+Open-Meteo is fetched over HTTPS. mbedTLS allocates from external memory (`CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC`). Hardware AES is off. It needs a 1600-byte internal DMA bounce buffer for TLS records stored in PSRAM, and that block is not free after the RGB and Wi-Fi DMA reservations. A failed Open-Meteo connection is logged with the `esp_err` name.
 
 The web panel listens on port 80 once the station has an IP address. Its task stack is 10 KB in PSRAM (`MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT`). After the RGB bounce buffers and the Wi-Fi DMA buffers are reserved, internal RAM has no contiguous 10 KB block left, and `httpd_start` fails with `ESP_ERR_HTTPD_TASK` when that stack is forced into internal RAM. The stack stays at 10 KB because the configuration handler keeps `app_model_t`, a log-name table, and the `log_list` scratch array on it.
 
 An NVS commit disables the flash cache, so that write cannot run on a PSRAM stack. `config_store_init` starts an `nvs_save` task with a 4096-byte internal stack before Wi-Fi, while internal RAM is still contiguous. `config_store_save` copies the new `clock_config_t` to that task and waits for the result. The web panel, the on-screen settings page, template scan, and the corner-gesture template change all use this path, because the HTTP, LVGL, and storage tasks have PSRAM stacks. Migration inside `config_store_init` writes NVS directly on `app_main`, whose stack is internal. `log_event` only queues a line; the `log` task writes the TF card from its own internal stack.
 
-The TF card is mounted once, after Wi-Fi init. A failed mount frees the SPI bus when this firmware created it. The card is not polled again until the next boot. The main-screen messages are:
+The TF card is mounted once, after Wi-Fi init. A failed mount frees the SPI bus when this firmware created it and is logged with `esp_err` and the largest free DMA block. The card is not polled again until the next boot. The main-screen messages are:
 
 | Condition | Text under **Uwaga** |
 | --- | --- |

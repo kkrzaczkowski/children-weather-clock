@@ -7,6 +7,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
+# Zmienna czcionka Montserrat. Bez ustawionej wagi FreeType bierze instancję Thin.
 TTF = ROOT / "tools" / "fonts" / "Montserrat-SemiBold.ttf"
 OUT = ROOT / "main" / "fonts"
 
@@ -15,16 +16,16 @@ ASCII = "".join(chr(c) for c in range(32, 127))
 DEGREE = "°"
 MINUS = "−"
 
+# name, px, alphabet, named variation or None (domyślna instancja pliku)
 FONTS = [
-    ("font_clock_56", 56, "0123456789:"),
-    ("font_clock_72", 72, "0123456789:"),
-    ("font_clock_88", 88, "0123456789:"),
-    ("font_temp_32", 32, "0123456789 /" + DEGREE + MINUS + "-"),
-    ("font_temp_40", 40, "0123456789 /" + DEGREE + MINUS + "-"),
-    ("font_temp_48", 48, "0123456789 /" + DEGREE + MINUS + "-"),
-    ("font_label_20", 20, ASCII + POLISH + DEGREE + MINUS),
-    ("font_label_28", 28, ASCII + POLISH + DEGREE + MINUS),
-    ("font_label_36", 36, ASCII + POLISH + DEGREE + MINUS),
+    ("font_clock_59", 59, "0123456789:", "Bold"),
+    ("font_clock_75", 75, "0123456789:", "Bold"),
+    ("font_clock_86", 86, "0123456789:", "Bold"),
+    ("font_temp_37", 37, "0123456789 /" + DEGREE + MINUS + "-", "Bold"),
+    ("font_temp_45", 45, "0123456789 /" + DEGREE + MINUS + "-", "Bold"),
+    ("font_label_20", 20, ASCII + POLISH + DEGREE + MINUS, None),
+    ("font_label_28", 28, ASCII + POLISH + DEGREE + MINUS, None),
+    ("font_label_36", 36, ASCII + POLISH + DEGREE + MINUS, None),
 ]
 
 
@@ -131,7 +132,14 @@ def ranges(codepoints):
     return runs
 
 
-def emit(name, size, alphabet, font, present):
+def load_font(size, weight):
+    font = ImageFont.truetype(str(TTF), size)
+    if weight:
+        font.set_variation_by_name(weight.encode("ascii"))
+    return font
+
+
+def emit(name, size, alphabet, font, present, weight):
     ordered = []
     seen = set()
     for char in alphabet:
@@ -163,7 +171,7 @@ def emit(name, size, alphabet, font, present):
         raise SystemExit(f"{name}: bitmapa przekracza 1 MB")
 
     lines = [
-        f"/* {name}: Montserrat SemiBold {size}px, bpp 4, bez kerningu */",
+        f"/* {name}: Montserrat {weight or 'SemiBold'} {size}px, bpp 4, bez kerningu */",
         '#include "lvgl.h"',
         "",
         "static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] = {",
@@ -233,8 +241,8 @@ def main():
         raise SystemExit(f"Brak fontu {TTF}")
     OUT.mkdir(parents=True, exist_ok=True)
     present = cmap_codes(TTF)
-    for name, size, alphabet in FONTS:
-        emit(name, size, alphabet, ImageFont.truetype(str(TTF), size), present)
+    for name, size, alphabet, weight in FONTS:
+        emit(name, size, alphabet, load_font(size, weight), present, weight)
 
 
 if __name__ == "__main__":

@@ -313,7 +313,7 @@ Wartości wcześniej traktowane jako propozycje zostały rozstrzygnięte. Obowi�
 
 ### 3.17. Typografia
 
-- FR-160: Rozmiary czcionek godziny, temperatur i etykiet prognozy są wybierane niezależnie: mały, średni albo duży. Domyślnie średni. W pikselach: godzina 56 / 72 / 88, temperatury 32 / 40 / 48, etykiety 20 / 28 / 36.
+- FR-160: Rozmiary czcionek godziny, temperatur i etykiet prognozy są wybierane niezależnie: mały, średni albo duży. Domyślnie średni. W pikselach: godzina 59 / 75 / 86, temperatury 37 / 45 / 45, etykiety 20 / 28 / 36. Godzina i temperatury są krojem Bold. Duży rozmiar temperatury jest taki sam jak średni, bo szerszy napis nie mieści się w ramce z odstępem 3 px.
 - FR-161: Każda kombinacja wariantów mieści się na ekranie 800×480 bez nakładania się elementów.
 - FR-162: Czcionki obsługują polskie znaki diakrytyczne oraz znaki `°` i `−`.
 
@@ -395,7 +395,7 @@ Kwestie poniżej są zamknięte i obowiązują w MVP.
 | OQ-05 | Zakres i wartość domyślna godziny prognozy | Pełne godziny 08:00–20:00; domyślnie 15:00 |
 | OQ-06 | Poziomy jasności dziennej i nocnej | Skala 10–100% co 10%; domyślnie 100% i 30% |
 | OQ-07 | Czy płyta umożliwia sprzętową regulację podświetlenia | Nie. EXIO2 jest wyjściem cyfrowym. Przyciemnianie jest programowe |
-| OQ-08 | Warianty rozmiarów czcionek | Mały, średni i duży. Godzina 56/72/88 px, temperatury 32/40/48 px, etykiety 20/28/36 px |
+| OQ-08 | Warianty rozmiarów czcionek | Mały, średni i duży. Godzina 59/75/86 px Bold, temperatury 37/45/45 px Bold, etykiety 20/28/36 px |
 | OQ-09 | Migracja konfiguracji po zmianie wersji schematu | Zachowanie poprawnych pól, wartości domyślne dla nowych i niepoprawnych |
 | OQ-10 | Zachowanie po wykryciu uszkodzonej konfiguracji | Wartości domyślne, wpis w logu, komunikat w konfiguracji |
 | OQ-11 | Poziomy szczegółowości logowania | Błąd, ostrzeżenie, informacja; domyślnie informacja |
